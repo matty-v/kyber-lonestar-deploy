@@ -6,19 +6,19 @@
 image:
   controlPlane:
     repository: ghcr.io/matty-v/kyber-control-plane
-    tag: "v2.5.0"
+    tag: "v2.6.0"
   nodeAgent:
     repository: ghcr.io/matty-v/kyber-node-agent
-    tag: "v2.5.0"
+    tag: "v2.6.0"
   agentBase:
     repository: ghcr.io/matty-v/kyber-runtime-base
-    tag: "v2.5.0"
+    tag: "v2.6.0"
   claudeCode:
     repository: ghcr.io/matty-v/kyber-claude-code
-    tag: "v2.5.0"
+    tag: "v2.6.0"
   statusSidecar:
     repository: ghcr.io/matty-v/kyber-status-sidecar
-    tag: "v2.5.0"
+    tag: "v2.6.0"
 # Public GHCR images — no pull secret required.
 imagePullSecrets: []
 
