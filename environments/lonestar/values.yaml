@@ -26,9 +26,13 @@ image:
   # kyber-mcp-discord sidecar (kyber#646) — injected into barf's pod (channels.discord).
   # Must move in lockstep with controlPlane: mentionOnly (#648) is the control
   # plane rendering DISCORD_MENTION_ONLY and this image honouring it.
+  # Ahead of controlPlane by kyber#649 (merge feb9ffb): mention-only now also
+  # honours a mention of the bot's own managed role, which is what Discord
+  # inserts when you pick "@Barf" from role autocomplete — sidecar-only change,
+  # so the control plane stays on 485a6d5.
   discordSidecar:
     repository: ghcr.io/matty-v/kyber-mcp-discord
-    tag: "485a6d5234c9234264fb3b1b994a5b1c9828e6d5@sha256:83f2236808196fef5b5707a7a24bb2fac655c580b750ae6f470b27c8c32f35bb"
+    tag: "feb9ffb5c153a56d642f02ffb91ab86001abe6ea@sha256:76e8b50f047222357d8d33681f8d38393acad878243eed8eec62cf12e7ddaa37"
 # Public GHCR images — no pull secret required.
 imagePullSecrets: []
 
