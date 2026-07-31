@@ -1,16 +1,27 @@
 # environments/lonestar/values.yaml
 # Kyber on Steve's Proxmox box — cluster kyber-lonestar.
 # Single-node k3s on Ubuntu 24.04, LAN-isolated VM, public via Cloudflare Tunnel.
-# Images pinned to release v2.6.0 (stable on-prem; bump by commit here).
+# Images pinned to release v2.6.0, with post-release fixes pinned by main-commit
+# digest where this cluster needs them (stable on-prem; bump by commit here).
 
 image:
-  # control-plane pinned to the post-v2.6.0 main build (merge 485a6d5) carrying
-  # two-way Discord (kyber#646) + the mentionOnly channel option (kyber#648).
-  # v2.6.0→HEAD is ONLY those two PRs, so the other four images stay on v2.6.0
-  # (no functional change) to keep the blast radius minimal.
+  # control-plane + claude-code pinned to the post-v2.6.0 main build (merge
+  # c3fa884). What this carries beyond the previous 485a6d5 pin:
+  #   kyber#657/#658 — same-origin WebSocket upgrades bypass the CORS allowlist.
+  #     Found on THIS cluster: the agent shell and the live event stream 403'd
+  #     from https://kyber-lonestar.voget.io (the PWA the control plane serves
+  #     itself) while working from Holocron, because CheckOrigin consulted only
+  #     the operator allowlist and had no same-origin rule.
+  #   kyber#653/#654 — the agent manual is rendered into every pod at boot as
+  #     <launch dir>/.runtime/KYBER.md (claude-code image), git-excluded so it
+  #     never leaks into an identity repo.
+  #   kyber#655/#659 — start-claude boot suite now runs in CI, plus the two
+  #     boot-path repairs it caught (branch-park warning, sync-script path).
+  # node-agent / runtime-base / status-sidecar stay on v2.6.0 — no functional
+  # change in that range — to keep the blast radius minimal.
   controlPlane:
     repository: ghcr.io/matty-v/kyber-control-plane
-    tag: "485a6d5234c9234264fb3b1b994a5b1c9828e6d5@sha256:77dcc29e639bfe6e0d2ee64a0181569c1cc325047f081e69d5501b9d895a527f"
+    tag: "c3fa8842d1f2d6d89256aff481862aebc6a5e873@sha256:421b197f9718ff4f427da3b92fe86e1ae3207100b6952bc17f984f941d2c6597"
   nodeAgent:
     repository: ghcr.io/matty-v/kyber-node-agent
     tag: "v2.6.0"
@@ -19,17 +30,18 @@ image:
     tag: "v2.6.0"
   claudeCode:
     repository: ghcr.io/matty-v/kyber-claude-code
-    tag: "v2.6.0"
+    tag: "c3fa8842d1f2d6d89256aff481862aebc6a5e873@sha256:42d027c19fe25d74d654c0ac17d1c1ee37ccf45c5429980178db931584df1f62"
   statusSidecar:
     repository: ghcr.io/matty-v/kyber-status-sidecar
     tag: "v2.6.0"
   # kyber-mcp-discord sidecar (kyber#646) — injected into barf's pod (channels.discord).
   # Must move in lockstep with controlPlane: mentionOnly (#648) is the control
   # plane rendering DISCORD_MENTION_ONLY and this image honouring it.
-  # Ahead of controlPlane by kyber#649 (merge feb9ffb): mention-only now also
-  # honours a mention of the bot's own managed role, which is what Discord
-  # inserts when you pick "@Barf" from role autocomplete — sidecar-only change,
-  # so the control plane stays on 485a6d5.
+  # Pinned at kyber#649 (merge feb9ffb): mention-only now also honours a mention
+  # of the bot's own managed role, which is what Discord inserts when you pick
+  # "@Barf" from role autocomplete. feb9ffb is an ancestor of the controlPlane
+  # pin above and images/mcp-discord is unchanged in feb9ffb..c3fa884, so this
+  # stays put — repinning would only churn the digest.
   discordSidecar:
     repository: ghcr.io/matty-v/kyber-mcp-discord
     tag: "feb9ffb5c153a56d642f02ffb91ab86001abe6ea@sha256:76e8b50f047222357d8d33681f8d38393acad878243eed8eec62cf12e7ddaa37"
