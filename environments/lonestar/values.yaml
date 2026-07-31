@@ -98,11 +98,25 @@ postgresql:
   auth:
     existingSecret: kyber-postgres-credentials
 
-# Durable log archive (MinIO + Vector) deferred — add after the core is green.
+# Durable log archive (MinIO + Vector). No cloud object store on this install, so
+# the archive runs on the s3 backend against in-cluster MinIO — same shape as razer.
+# Backs GET /agents/{name}/logs?source=archive|transcript; without it the PWA's
+# agent history returns 503 ("KYBER_LOG_ARCHIVE_BUCKET unset").
+# kyber-minio-credentials (access-key-id/secret-access-key) is pre-created
+# out-of-band so ArgoCD renders don't regenerate the root password each sync.
 minio:
-  enabled: false
+  enabled: true
+  existingSecret: kyber-minio-credentials
+  persistence:
+    storageClassName: ""
 logShipper:
-  enabled: false
+  enabled: true
+  backend: s3
+  bucket: kyber-agent-logs
+  endpoint: http://kyber-lonestar-minio.kyber-system.svc:9000
+  region: us-east-1
+  useTLS: false
+  existingCredentialsSecret: kyber-minio-credentials
 
 # Agent identity repos — managed by the per-install "Kyber-lonestar" GitHub App
 # (App ID 4442436, installed on matty-v). The kyber-github-app Secret
