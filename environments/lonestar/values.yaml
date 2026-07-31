@@ -93,3 +93,10 @@ minio:
   enabled: false
 logShipper:
   enabled: false
+
+# Agent identity repos — managed by the per-install "Kyber-lonestar" GitHub App
+# (App ID 4442436, installed on matty-v). The kyber-github-app Secret
+# (app-id/installation-id/private-key.pem) is pre-created out-of-band. defaultOwner
+# is the account the App is installed on = where agent identity repos live.
+identityRepo:
+  defaultOwner: "matty-v"
