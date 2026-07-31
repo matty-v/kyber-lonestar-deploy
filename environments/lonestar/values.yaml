@@ -45,10 +45,20 @@ networkPolicy:
       - "10.42.0.0/16"          # k3s default pod CIDR (agent pods)
       - "192.168.176.244/32"    # kyber-lonestar node InternalIP (hostNetwork node-agent)
 
-# Cloudflare Tunnel — public ingress. Enabled at the tunnel step once the tunnel
-# credentials Secret (kyber-cloudflared-creds) exists. Off for the core bring-up.
+# Cloudflare Tunnel — public ingress at https://kyber-lonestar.voget.io.
+# The tunnel dials OUT from the VM (no inbound/firewall change on Steve's LAN).
+# Credentials live in kyber-cloudflared-creds (key credentials.json), created
+# out-of-band from a tunnel provisioned via the Cloudflare API.
 cloudflared:
-  enabled: false
+  enabled: true
+  tunnelId: "f3cdb15d-58df-4132-9af9-8ddc1017f17f"
+  existingSecret: kyber-cloudflared-creds
+  # Force TCP/443 (http2) rather than QUIC/UDP — Steve's LAN egress policy may
+  # filter outbound UDP; http2 uses the same TLS listener as normal HTTPS.
+  protocol: http2
+  ingress:
+    - hostname: kyber-lonestar.voget.io
+      service: http://kyber-lonestar-control-plane:8080
 
 # Single node, no cloud — Machine Controller uses the mock adapter.
 compute:
