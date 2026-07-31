@@ -1,7 +1,7 @@
 # environments/lonestar/values.yaml
 # Kyber on Steve's Proxmox box — cluster kyber-lonestar.
 # Single-node k3s on Ubuntu 24.04, LAN-isolated VM, public via Cloudflare Tunnel.
-# Images pinned to release v2.5.0 (stable on-prem; bump by commit here).
+# Images pinned to release v2.6.0 (stable on-prem; bump by commit here).
 
 image:
   controlPlane:
