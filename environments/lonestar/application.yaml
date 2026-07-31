@@ -1,0 +1,56 @@
+# environments/lonestar/application.yaml
+# ArgoCD Application for Kyber on Steve's Proxmox box (kyber-lonestar cluster).
+# Multi-source: Helm chart from matty-v/kyber (tracks main) + per-cluster values
+# from this repo. Images are pinned to a release tag in values.yaml (no Image
+# Updater) — the stable on-prem model; advance by value-bump commit here.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kyber-lonestar
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argoproj.io
+spec:
+  project: default
+  sources:
+    - repoURL: https://github.com/matty-v/kyber.git
+      targetRevision: main
+      path: deploy/helm/kyber
+      helm:
+        releaseName: kyber-lonestar
+        valueFiles:
+          - $values/environments/lonestar/values.yaml
+    - repoURL: https://github.com/matty-v/kyber-lonestar-deploy.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kyber-system
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+  # Ignore StatefulSet VCT defaults Kubernetes adds post-creation.
+  ignoreDifferences:
+    - group: apps
+      kind: StatefulSet
+      jsonPointers:
+        - /spec/volumeClaimTemplates
+    # Runtime-detection Anthropic key: written into this Secret by the PWA
+    # (PUT /api/v1/settings/anthropic-key). Chart renders it empty; without this
+    # ignore, selfHeal reverts the operator-entered key back to empty.
+    - group: ""
+      kind: Secret
+      name: kyber-lonestar-anthropic-key
+      jsonPointers:
+        - /data/api-key
+    # Fleet defaults (defaultModel / defaultRuntimeVersion) edited via the PWA
+    # into this ConfigMap; ignore /data so selfHeal doesn't revert operator edits.
+    - group: ""
+      kind: ConfigMap
+      name: kyber-fleet-defaults
+      jsonPointers:
+        - /data

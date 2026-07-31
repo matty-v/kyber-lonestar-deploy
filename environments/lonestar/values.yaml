@@ -1,0 +1,85 @@
+# environments/lonestar/values.yaml
+# Kyber on Steve's Proxmox box — cluster kyber-lonestar.
+# Single-node k3s on Ubuntu 24.04, LAN-isolated VM, public via Cloudflare Tunnel.
+# Images pinned to release v2.5.0 (stable on-prem; bump by commit here).
+
+image:
+  controlPlane:
+    repository: ghcr.io/matty-v/kyber-control-plane
+    tag: "v2.5.0"
+  nodeAgent:
+    repository: ghcr.io/matty-v/kyber-node-agent
+    tag: "v2.5.0"
+  agentBase:
+    repository: ghcr.io/matty-v/kyber-runtime-base
+    tag: "v2.5.0"
+  claudeCode:
+    repository: ghcr.io/matty-v/kyber-claude-code
+    tag: "v2.5.0"
+  statusSidecar:
+    repository: ghcr.io/matty-v/kyber-status-sidecar
+    tag: "v2.5.0"
+# Public GHCR images — no pull secret required.
+imagePullSecrets: []
+
+api:
+  existingSecret: kyber-api-credentials
+  publicURL: "https://kyber-lonestar.voget.io"
+  service:
+    type: LoadBalancer
+
+# Per-agent internal :8082 authz (kyber#566). Signing key pre-created
+# out-of-band (kyber-internal-signing-key). Start in GRACE (accept-and-log
+# un-tokened calls) for first boot; flip to enforce (graceMode: false) after
+# verifying the fleet carries mounted pod-tokens.
+internalAuth:
+  graceMode: true
+
+# :8082-scoped NetworkPolicy (defense-in-depth). k3s ENFORCES NetworkPolicy, so
+# the hostNetwork node-agent's node IP and the pod CIDR must be admitted or its
+# :8082 calls are dropped. Single-node cluster.
+networkPolicy:
+  enabled: true
+  internalApi:
+    allowedNodeCIDRs:
+      - "10.42.0.0/16"          # k3s default pod CIDR (agent pods)
+      - "192.168.176.244/32"    # kyber-lonestar node InternalIP (hostNetwork node-agent)
+
+# Cloudflare Tunnel — public ingress. Enabled at the tunnel step once the tunnel
+# credentials Secret (kyber-cloudflared-creds) exists. Off for the core bring-up.
+cloudflared:
+  enabled: false
+
+# Single node, no cloud — Machine Controller uses the mock adapter.
+compute:
+  provider: mock
+
+# k3s join config lives in kyber-api-credentials (k3s-join-token, k3s-server-url).
+k3s:
+  existingSecret: ""
+
+controlPlane:
+  clusterName: "kyber-lonestar"
+  cors:
+    allowedOrigins:
+      - "https://holocron.voget.io"
+      - "http://localhost:5173"
+
+# Use k3s's default local-path StorageClass (chart default kyber-pd is GCE-only).
+storage:
+  agentStorageClass: ""
+  gcePD:
+    enabled: false
+  transcriptOffsets:
+    storageClassName: ""
+
+# Postgres password pre-provisioned out-of-band (kyber-postgres-credentials).
+postgresql:
+  auth:
+    existingSecret: kyber-postgres-credentials
+
+# Durable log archive (MinIO + Vector) deferred — add after the core is green.
+minio:
+  enabled: false
+logShipper:
+  enabled: false
