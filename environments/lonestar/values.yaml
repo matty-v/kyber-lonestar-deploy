@@ -4,12 +4,13 @@
 # Images pinned to release v2.6.0 (stable on-prem; bump by commit here).
 
 image:
-  # control-plane pinned to the post-v2.6.0 main build (merge a36d15ee) that adds
-  # two-way Discord (kyber#646). v2.6.0→HEAD is ONLY that PR, so the other four
-  # images stay on v2.6.0 (no functional change) to keep the blast radius minimal.
+  # control-plane pinned to the post-v2.6.0 main build (merge 485a6d5) carrying
+  # two-way Discord (kyber#646) + the mentionOnly channel option (kyber#648).
+  # v2.6.0→HEAD is ONLY those two PRs, so the other four images stay on v2.6.0
+  # (no functional change) to keep the blast radius minimal.
   controlPlane:
     repository: ghcr.io/matty-v/kyber-control-plane
-    tag: "a36d15ee01fe48f0c2baa082de2b67e5d4056b22@sha256:8d7aa02e029cd87fd70f84de8e655aa363effe259fba56f3afb057fb01b5881b"
+    tag: "485a6d5234c9234264fb3b1b994a5b1c9828e6d5@sha256:77dcc29e639bfe6e0d2ee64a0181569c1cc325047f081e69d5501b9d895a527f"
   nodeAgent:
     repository: ghcr.io/matty-v/kyber-node-agent
     tag: "v2.6.0"
@@ -23,9 +24,11 @@ image:
     repository: ghcr.io/matty-v/kyber-status-sidecar
     tag: "v2.6.0"
   # kyber-mcp-discord sidecar (kyber#646) — injected into barf's pod (channels.discord).
+  # Must move in lockstep with controlPlane: mentionOnly (#648) is the control
+  # plane rendering DISCORD_MENTION_ONLY and this image honouring it.
   discordSidecar:
     repository: ghcr.io/matty-v/kyber-mcp-discord
-    tag: "a36d15ee01fe48f0c2baa082de2b67e5d4056b22@sha256:e78bfa6164f5a0e21545811f906c4fb413c1ced90eb91ac3485fa96bd0adf313"
+    tag: "485a6d5234c9234264fb3b1b994a5b1c9828e6d5@sha256:83f2236808196fef5b5707a7a24bb2fac655c580b750ae6f470b27c8c32f35bb"
 # Public GHCR images — no pull secret required.
 imagePullSecrets: []
 
