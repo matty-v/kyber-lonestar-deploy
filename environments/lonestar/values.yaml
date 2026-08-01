@@ -5,8 +5,22 @@
 # digest where this cluster needs them (stable on-prem; bump by commit here).
 
 image:
-  # control-plane + claude-code pinned to the post-v2.6.0 main build (merge
-  # 86534fa). What this carries beyond the previous 485a6d5 pin:
+  # control-plane pinned to the post-v2.6.0 main build (merge 132a5be), which
+  # adds per-agent comms configuration (kyber#664):
+  #   kyber#665 — GET/PUT/DELETE /api/v1/agents/{name}/comms/{telegram,discord}.
+  #     One PUT now writes the <agent>-discord Secret, the matching `discord`
+  #     inbound binding, and spec.channels.discord together, generating the
+  #     shared HMAC secret itself. That replaces the three hand-run kubectl
+  #     steps this cluster's barf was wired with — including the copy-once
+  #     secret an operator had to move between two places, where a mismatch
+  #     dropped inbound silently. Telegram becomes configurable after creation
+  #     for the first time (enable / disable / rotate a leaked bot token).
+  #   kyber#667 — the PWA Comms tab and the create-wizard Discord section that
+  #     drive it. The embedded PWA ships inside this image.
+  # claude-code stays on the 86534fa build — images/ is untouched in
+  # 86534fa..132a5be, so NOTHING here rolls an agent pod. barf's live session
+  # and its Discord sidecar survive this deploy; only the control plane
+  # restarts. What the previous 86534fa pin carries:
   #   kyber#657/#658 — same-origin WebSocket upgrades bypass the CORS allowlist.
   #     Found on THIS cluster: the agent shell and the live event stream 403'd
   #     from https://kyber-lonestar.voget.io (the PWA the control plane serves
@@ -27,7 +41,7 @@ image:
   # change in that range — to keep the blast radius minimal.
   controlPlane:
     repository: ghcr.io/matty-v/kyber-control-plane
-    tag: "86534fadeaed53a8f29e62b544ca224860b823ab@sha256:732e070e84c06e4e9bcf9c35a328081434d90fd988390203bddf9a11eeca2b39"
+    tag: "132a5be46222782d16e12f2b2ea2b2daf59ec23e@sha256:7123b352db465f13a3bbbfb2b217f30d8c90fb13ab1a4acf9ac8e4c5c6f23c8c"
   nodeAgent:
     repository: ghcr.io/matty-v/kyber-node-agent
     tag: "v2.6.0"
