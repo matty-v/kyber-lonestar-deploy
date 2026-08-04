@@ -33,6 +33,24 @@ image:
   claudeCode:
     repository: ghcr.io/matty-v/kyber-claude-code
     tag: "v2.6.2@sha256:cedb2c5e06e2e8864e46be7ea00b29e8df6eff076c05c23a37d6881e3b8668e4"
+  # codex — the second agent runtime (kyber#672). Required here because hk-47 is
+  # a Codex agent. The chart treats this tag as OPTIONAL and simply omits
+  # KYBER_CODEX_RUNTIME_IMAGE when it is empty
+  # (deploy/helm/kyber/templates/control-plane/deployment.yaml:191); the codex
+  # adapter then returns "" for the image and the reconciler builds a pod whose
+  # containers[0].image is empty. The API server rejects that with
+  # `spec.containers[0].image: Required value`, the reconcile returns early
+  # before the phase is ever written, and the Agent sits with a BLANK status
+  # forever — no pod, no phase, no message. That is exactly what hk-47 hit.
+  #
+  # NOTE: unlike every other image here, ghcr.io/matty-v/kyber-codex is a
+  # PRIVATE GHCR package, and this cluster sets imagePullSecrets: []. Setting
+  # this tag moves hk-47 from "no pod at all" to ImagePullBackOff; it is not
+  # sufficient on its own. Either the package goes public (matching the rest of
+  # the fleet) or this install needs a GHCR pull secret.
+  codex:
+    repository: ghcr.io/matty-v/kyber-codex
+    tag: "v2.6.2@sha256:8ba864d216a1d953a52cfbfd8e130d1119630108aa3f483d0af548cd924dbcd6"
   statusSidecar:
     repository: ghcr.io/matty-v/kyber-status-sidecar
     tag: "v2.6.2@sha256:30adf245f1595c556445448710b3bf3043c5819de9f79f3d6e21129f05ff33d8"
