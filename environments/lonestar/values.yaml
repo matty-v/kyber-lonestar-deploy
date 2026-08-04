@@ -1,70 +1,52 @@
 # environments/lonestar/values.yaml
 # Kyber on Steve's Proxmox box — cluster kyber-lonestar.
 # Single-node k3s on Ubuntu 24.04, LAN-isolated VM, public via Cloudflare Tunnel.
-# Images pinned to release v2.6.0, with post-release fixes pinned by main-commit
-# digest where this cluster needs them (stable on-prem; bump by commit here).
+# Images pinned to release v2.6.2 (digest-pinned). The cluster is back on a clean
+# release line: every post-v2.6.0 commit this cluster had been carrying by main-commit
+# digest is an ancestor of v2.6.2, so this bump is purely forward.
 
 image:
-  # control-plane pinned to the post-v2.6.0 main build (merge 132a5be), which
-  # adds per-agent comms configuration (kyber#664):
-  #   kyber#665 — GET/PUT/DELETE /api/v1/agents/{name}/comms/{telegram,discord}.
-  #     One PUT now writes the <agent>-discord Secret, the matching `discord`
-  #     inbound binding, and spec.channels.discord together, generating the
-  #     shared HMAC secret itself. That replaces the three hand-run kubectl
-  #     steps this cluster's barf was wired with — including the copy-once
-  #     secret an operator had to move between two places, where a mismatch
-  #     dropped inbound silently. Telegram becomes configurable after creation
-  #     for the first time (enable / disable / rotate a leaked bot token).
-  #   kyber#667 — the PWA Comms tab and the create-wizard Discord section that
-  #     drive it. The embedded PWA ships inside this image.
-  # claude-code stays on the 86534fa build — images/ is untouched in
-  # 86534fa..132a5be, so NOTHING here rolls an agent pod. barf's live session
-  # and its Discord sidecar survive this deploy; only the control plane
-  # restarts. What the previous 86534fa pin carries:
-  #   kyber#657/#658 — same-origin WebSocket upgrades bypass the CORS allowlist.
-  #     Found on THIS cluster: the agent shell and the live event stream 403'd
-  #     from https://kyber-lonestar.voget.io (the PWA the control plane serves
-  #     itself) while working from Holocron, because CheckOrigin consulted only
-  #     the operator allowlist and had no same-origin rule.
-  #   kyber#653/#654 — the agent manual is rendered into every pod at boot as
-  #     <launch dir>/.runtime/KYBER.md (claude-code image), git-excluded so it
-  #     never leaks into an identity repo.
-  #   kyber#655/#659 — start-claude boot suite now runs in CI, plus the two
-  #     boot-path repairs it caught (branch-park warning, sync-script path).
-  #   kyber#660/#661 — #654 never actually worked: COPY --chmod=0644 also
-  #     stripped the execute bit off the /opt/kyber directory BuildKit created,
-  #     so the unprivileged `kyber` user could not traverse into it and the
-  #     manual silently never rendered. Reproduced on THIS cluster against the
-  #     c3fa884 image. Directory is now created explicitly (0755), and an
-  #     unreadable-but-present manual logs instead of no-op'ing.
-  # node-agent / runtime-base / status-sidecar stay on v2.6.0 — no functional
-  # change in that range — to keep the blast radius minimal.
+  # All six images on the v2.6.2 release, digest-pinned. Digests resolved from
+  # GHCR at bump time and cross-checked against the falcon environment's v2.6.2
+  # pins (kyber-deploy#123) — same release, same digests.
+  #
+  # This retires the two main-commit pins this cluster was carrying. Both are
+  # ancestors of the v2.6.2 tag (verified with `git merge-base --is-ancestor`),
+  # so nothing regresses:
+  #   - control-plane 132a5be (per-agent comms config, kyber#664/#665/#667)
+  #   - claude-code   86534fa (same-origin WS #657/#658, agent manual
+  #                            #653/#654/#660/#661, boot suite #655/#659)
+  #
+  # ROLLS AGENT PODS. Unlike the previous bump, claude-code and runtime-base
+  # both move here, so barf and threepio restart and their live sessions end.
+  # That is expected for a release bump — their identity repos and PVCs are
+  # untouched, so they come back with memory and continuity intact.
   controlPlane:
     repository: ghcr.io/matty-v/kyber-control-plane
-    tag: "132a5be46222782d16e12f2b2ea2b2daf59ec23e@sha256:7123b352db465f13a3bbbfb2b217f30d8c90fb13ab1a4acf9ac8e4c5c6f23c8c"
+    tag: "v2.6.2@sha256:80a69f321121e3321d9ea2cb738d8980780760225a20ab290d9542af09724376"
   nodeAgent:
     repository: ghcr.io/matty-v/kyber-node-agent
-    tag: "v2.6.0"
+    tag: "v2.6.2@sha256:f8b7a0bc749ba6c13a0e0887837c47b0fafe648db5a3eb079bc57f0bc300555e"
   agentBase:
     repository: ghcr.io/matty-v/kyber-runtime-base
-    tag: "v2.6.0"
+    tag: "v2.6.2@sha256:753226e08585def1d0cad52a32dc2177a93486a575117960d091efb931de9fb3"
   claudeCode:
     repository: ghcr.io/matty-v/kyber-claude-code
-    tag: "86534fadeaed53a8f29e62b544ca224860b823ab@sha256:d98c0265dd2d968eef10dbb593bbfc68f7c55582240a1a14986b41ac01a67c90"
+    tag: "v2.6.2@sha256:cedb2c5e06e2e8864e46be7ea00b29e8df6eff076c05c23a37d6881e3b8668e4"
   statusSidecar:
     repository: ghcr.io/matty-v/kyber-status-sidecar
-    tag: "v2.6.0"
+    tag: "v2.6.2@sha256:30adf245f1595c556445448710b3bf3043c5819de9f79f3d6e21129f05ff33d8"
   # kyber-mcp-discord sidecar (kyber#646) — injected into barf's pod (channels.discord).
   # Must move in lockstep with controlPlane: mentionOnly (#648) is the control
-  # plane rendering DISCORD_MENTION_ONLY and this image honouring it.
-  # Pinned at kyber#649 (merge feb9ffb): mention-only now also honours a mention
-  # of the bot's own managed role, which is what Discord inserts when you pick
-  # "@Barf" from role autocomplete. feb9ffb is an ancestor of the controlPlane
-  # pin above and images/mcp-discord is unchanged in feb9ffb..86534fa, so this
-  # stays put — repinning would only churn the digest.
+  # plane rendering DISCORD_MENTION_ONLY and this image honouring it, so it comes
+  # onto v2.6.2 with everything else rather than being left behind on a commit pin.
+  # No behaviour change: images/mcp-discord has no commits in feb9ffb..v2.6.2, so
+  # this still carries exactly kyber#649 (mention-only also honours a mention of the
+  # bot's own managed role — what Discord inserts when you pick "@Barf" from role
+  # autocomplete). The digest differs only because the release rebuilt the image.
   discordSidecar:
     repository: ghcr.io/matty-v/kyber-mcp-discord
-    tag: "feb9ffb5c153a56d642f02ffb91ab86001abe6ea@sha256:76e8b50f047222357d8d33681f8d38393acad878243eed8eec62cf12e7ddaa37"
+    tag: "v2.6.2@sha256:815b9f1a8d360cbaafad49be5830218da75f710993eae540d73dfd47626d4ecf"
 # Public GHCR images — no pull secret required.
 imagePullSecrets: []
 
