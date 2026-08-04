@@ -1,38 +1,43 @@
 # environments/lonestar/values.yaml
 # Kyber on Steve's Proxmox box — cluster kyber-lonestar.
 # Single-node k3s on Ubuntu 24.04, LAN-isolated VM, public via Cloudflare Tunnel.
-# Images pinned to release v2.6.2 (digest-pinned). The cluster is back on a clean
-# release line: every post-v2.6.0 commit this cluster had been carrying by main-commit
-# digest is an ancestor of v2.6.2, so this bump is purely forward.
+# Images pinned to release v2.6.3 (digest-pinned). The cluster tracks the release
+# line; every pin here is a tagged release build, never a main-commit digest.
 
 image:
-  # All six images on the v2.6.2 release, digest-pinned. Digests resolved from
-  # GHCR at bump time and cross-checked against the falcon environment's v2.6.2
-  # pins (kyber-deploy#123) — same release, same digests.
+  # All seven images on the v2.6.3 release, digest-pinned. Digests resolved from
+  # GHCR at bump time; controlPlane, nodeAgent and claudeCode cross-checked
+  # against the falcon environment's v2.6.3 pins (kyber-deploy#126) and against
+  # what falcon is actually running — same release, same digests.
   #
-  # This retires the two main-commit pins this cluster was carrying. Both are
-  # ancestors of the v2.6.2 tag (verified with `git merge-base --is-ancestor`),
-  # so nothing regresses:
-  #   - control-plane 132a5be (per-agent comms config, kyber#664/#665/#667)
-  #   - claude-code   86534fa (same-origin WS #657/#658, agent manual
-  #                            #653/#654/#660/#661, boot suite #655/#659)
+  # What v2.6.3 carries that v2.6.2 did not:
+  #   - kyber#675 — an Agent on an unconfigured runtime sat with a blank status
+  #     forever. Now a 400 at create time plus a visible RuntimeImageMissing
+  #     condition. This is the bug hk-47 hit on this very cluster (see the codex
+  #     note below); the fix means the next occurrence says so out loud.
+  #     Also fixes Discord late-join deafness and a State.Guilds data race.
+  #   - kyber#677 — Codex agents never cloned their identity repo. hk-47 has been
+  #     living this: /home/kyber/dev did not exist in his pod at all. This bump is
+  #     what finally gives him an identity repo.
+  #   - kyber#679 — the pre-flight model probe leaked a SECOND Telegram poller on
+  #     every pod boot. Two readers on a one-reader token means the loser exits
+  #     permanently and the agent goes silently deaf. Closes kyber#678.
   #
-  # ROLLS AGENT PODS. Unlike the previous bump, claude-code and runtime-base
-  # both move here, so barf and threepio restart and their live sessions end.
-  # That is expected for a release bump — their identity repos and PVCs are
-  # untouched, so they come back with memory and continuity intact.
+  # ROLLS AGENT PODS. claude-code, runtime-base and codex all move, so barf,
+  # threepio and hk-47 restart and their live sessions end. Identity repos and
+  # PVCs are untouched, so they come back with memory and continuity intact.
   controlPlane:
     repository: ghcr.io/matty-v/kyber-control-plane
-    tag: "v2.6.2@sha256:80a69f321121e3321d9ea2cb738d8980780760225a20ab290d9542af09724376"
+    tag: "v2.6.3@sha256:b5fac9602dd14c3bafe0222964178d82eb3df00378128c061716da02ba73c53d"
   nodeAgent:
     repository: ghcr.io/matty-v/kyber-node-agent
-    tag: "v2.6.2@sha256:f8b7a0bc749ba6c13a0e0887837c47b0fafe648db5a3eb079bc57f0bc300555e"
+    tag: "v2.6.3@sha256:433e8396284bc67a240b1f95282a5f26dea3f6e4bd3ee789da9319400df670e9"
   agentBase:
     repository: ghcr.io/matty-v/kyber-runtime-base
-    tag: "v2.6.2@sha256:753226e08585def1d0cad52a32dc2177a93486a575117960d091efb931de9fb3"
+    tag: "v2.6.3@sha256:e47f85522a110a6ec19f637108aa0ff0a4675bfc3ddfe4a7195ea535f57f4ef0"
   claudeCode:
     repository: ghcr.io/matty-v/kyber-claude-code
-    tag: "v2.6.2@sha256:cedb2c5e06e2e8864e46be7ea00b29e8df6eff076c05c23a37d6881e3b8668e4"
+    tag: "v2.6.3@sha256:59d15dcec26645bcb50156d13b8695648429a49c33bf94b1cdc85c957c2b2788"
   # codex — the second agent runtime (kyber#672). Required here because hk-47 is
   # a Codex agent. The chart treats this tag as OPTIONAL and simply omits
   # KYBER_CODEX_RUNTIME_IMAGE when it is empty
@@ -43,28 +48,28 @@ image:
   # before the phase is ever written, and the Agent sits with a BLANK status
   # forever — no pod, no phase, no message. That is exactly what hk-47 hit.
   #
-  # NOTE: unlike every other image here, ghcr.io/matty-v/kyber-codex is a
-  # PRIVATE GHCR package, and this cluster sets imagePullSecrets: []. Setting
-  # this tag moves hk-47 from "no pod at all" to ImagePullBackOff; it is not
-  # sufficient on its own. Either the package goes public (matching the rest of
-  # the fleet) or this install needs a GHCR pull secret.
+  # ghcr.io/matty-v/kyber-codex used to be a PRIVATE GHCR package, which with
+  # imagePullSecrets: [] would have left hk-47 in ImagePullBackOff. It is public
+  # now — re-verified at bump time with an ANONYMOUS ghcr.io token: a manifest
+  # HEAD for v2.6.3 returns 200, while kyber-mcp-telegram (still private) returns
+  # 403 as a control. Re-check that before moving this pin again; a private image
+  # here fails at pull time, not at render time.
   codex:
     repository: ghcr.io/matty-v/kyber-codex
-    tag: "v2.6.2@sha256:8ba864d216a1d953a52cfbfd8e130d1119630108aa3f483d0af548cd924dbcd6"
+    tag: "v2.6.3@sha256:7d5426c132f8267fb1b01da0cf06659e6636aaff42d552fe937ca3b1b02215c2"
   statusSidecar:
     repository: ghcr.io/matty-v/kyber-status-sidecar
-    tag: "v2.6.2@sha256:30adf245f1595c556445448710b3bf3043c5819de9f79f3d6e21129f05ff33d8"
+    tag: "v2.6.3@sha256:4e397de8a6212b74af0511599a19a03b5cd21e936e2384b3b0c39664848102a8"
   # kyber-mcp-discord sidecar (kyber#646) — injected into barf's pod (channels.discord).
   # Must move in lockstep with controlPlane: mentionOnly (#648) is the control
-  # plane rendering DISCORD_MENTION_ONLY and this image honouring it, so it comes
-  # onto v2.6.2 with everything else rather than being left behind on a commit pin.
-  # No behaviour change: images/mcp-discord has no commits in feb9ffb..v2.6.2, so
-  # this still carries exactly kyber#649 (mention-only also honours a mention of the
-  # bot's own managed role — what Discord inserts when you pick "@Barf" from role
-  # autocomplete). The digest differs only because the release rebuilt the image.
+  # plane rendering DISCORD_MENTION_ONLY and this image honouring it, so it moves
+  # with the rest of the release rather than being left behind.
+  # v2.6.3 DOES change this image: kyber#675 fixed Discord late-join deafness (a
+  # sidecar that connects before its bot is invited to a guild stays silently
+  # deaf) and a data race on State.Guilds. Barf is the consumer here.
   discordSidecar:
     repository: ghcr.io/matty-v/kyber-mcp-discord
-    tag: "v2.6.2@sha256:815b9f1a8d360cbaafad49be5830218da75f710993eae540d73dfd47626d4ecf"
+    tag: "v2.6.3@sha256:0e8261c1a84082721d9ea8990ffba988fae45c59d5b2bf54a06bfe4ca37f9079"
 # Public GHCR images — no pull secret required.
 imagePullSecrets: []
 
