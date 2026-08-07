@@ -1,56 +1,58 @@
 # environments/lonestar/values.yaml
 # Kyber on Steve's Proxmox box — cluster kyber-lonestar.
 # Single-node k3s on Ubuntu 24.04, LAN-isolated VM, public via Cloudflare Tunnel.
-# Images pinned to release v2.7.0 (digest-pinned). The cluster tracks the release
+# Images pinned to release v2.7.1 (digest-pinned). The cluster tracks the release
 # line; every pin here is a tagged release build, never a main-commit digest.
 
 image:
-  # All EIGHT images on the v2.7.0 release, digest-pinned. Digests resolved from
+  # All EIGHT images on the v2.7.1 release, digest-pinned. Digests resolved from
   # GHCR at bump time with an ANONYMOUS pull token — that anonymous 200 is also
   # the public-pullability proof this cluster needs, because imagePullSecrets is
   # empty here (a private image fails at pull time, not at render time).
-  # Cross-checked against the falcon environment's v2.7.0 pins — same release,
-  # same digests.
+  # Cross-checked against the falcon environment's v2.7.1 pins (kyber-deploy#132)
+  # — same release, same digests, all eight verified identical.
   #
-  # Eight, not seven: telegramSidecar is NEW to this file (see its note below).
-  #
-  # What v2.7.0 carries that v2.6.3 did not:
-  #   - kyber#693 — Telegram sidecar interactions: inbound attachments, edited
-  #     messages, reactions, callbacks and coalesced media albums; inline buttons
-  #     on reply and tri-state keyboard handling on edit_message; outbound files
-  #     via native Telegram photo/video/audio/voice/document/media-group methods;
-  #     typing indicators. Also converges Telegram config across Codex and Claude
-  #     Code agents (allowlist/HMAC/binding migration for existing agents).
-  #   - kyber#695 — the inbound envelope dropped message_id, so `react` and
-  #     `edit_message` could not target a user's message at all. The sidecar was
-  #     always sending it; the binding's JSON-path map just didn't carry it.
-  #     Closes kyber#694.
-  #   - kyber#696 — Codex agents get two auth paths (in-pod `codex login
-  #     --device-auth` for ChatGPT subscriptions, or plain OPENAI_API_KEY) and
-  #     now carry session recall + identity-repo skills across a restart the way
-  #     Claude Code agents already do. hk-47 is the consumer on this cluster:
-  #     v2.6.3 finally gave him an identity repo, this makes him keep it and his
-  #     continuity across a pod roll.
-  #   - kyber#697 — Streamable HTTP Discord MCP: reply, edit, reactions,
-  #     attachment download/upload, long-message splitting, threads, bounded
-  #     recent context, connection diagnostics, idle-gated config convergence.
-  #     Barf is the consumer here.
+  # What v2.7.1 carries that v2.7.0 did not — kyber#701, two operator-facing
+  # failures that shared one shape: the platform hit a REAL failure, then told
+  # the operator something that pointed at a different, HEALTHY subsystem. Both
+  # were found on THIS cluster, which is the argument for not leaving lonestar
+  # behind on 2.7.0:
+  #   - force-needs-auth could never have worked (#395). The controller has
+  #     handled the intent correctly since #395, but NeedsAuth was never added to
+  #     the kubebuilder Enum on AgentSpec.DesiredPhase, so the API server
+  #     rejected every write and the endpoint returned a blanket 500. The action
+  #     had never once succeeded since it shipped. Reproduced HERE 2026-08-06:
+  #     force-needs-auth 500'd while restart — a permitted enum value — returned
+  #     200 against the same agent seconds later. This is not API-only: the PWA
+  #     offers it from every recoverable phase, and on Starting it is the ONLY
+  #     lifecycle action offered, so a stuck-Starting agent had exactly one
+  #     recovery button and it always failed. A schema rejection now returns 400
+  #     invalid_desired_phase carrying the API server's reason.
+  #   - the identity-repo credential helper failed SILENTLY. Every unhappy path
+  #     in the generated git-credential-kyber-github exited 0 with no output; git
+  #     then retries anonymously and GitHub answers 404 on a private repo, so the
+  #     operator sees "Repository not found" — which reads as "the repo is gone"
+  #     or "the App lost access" when the truth is "the helper produced nothing".
+  #     The script's own comment claimed it "fails LOUDLY". It did not. hk-47 hit
+  #     this HERE 2026-08-06 and correctly refused to edit his identity until it
+  #     was verified; both subsystems he was sent to audit were fine. This fix
+  #     rides in the runtime images, which is why claude-code and codex move.
   #
   # ROLLS AGENT PODS. claude-code, runtime-base and codex all move, so barf,
   # threepio and hk-47 restart and their live sessions end. Identity repos and
   # PVCs are untouched, so they come back with memory and continuity intact.
   controlPlane:
     repository: ghcr.io/matty-v/kyber-control-plane
-    tag: "v2.7.0@sha256:fe0a6d4ac03be60fc5213f4a55fb504269ced8f6c2b2f50bdf5fd356b8c6bb25"
+    tag: "v2.7.1@sha256:176075d6fa21cc400ef2fe0f612819fbf5d5551095264c22a700a4fccdb4a83e"
   nodeAgent:
     repository: ghcr.io/matty-v/kyber-node-agent
-    tag: "v2.7.0@sha256:0dc95532e9eff0285b05d80ba84f4d155989c6d6ab534c3f635b7e71ff3339db"
+    tag: "v2.7.1@sha256:e3838777a05087b3acabec1df206c4379c14105f7767ab8f59abbc2b483a04cf"
   agentBase:
     repository: ghcr.io/matty-v/kyber-runtime-base
-    tag: "v2.7.0@sha256:957618b21e1f153f1a26f33390503052dc10ec5a6086bef130f97151b0e14b6a"
+    tag: "v2.7.1@sha256:cc601e3992ab1215d702c6113310b1060949bcee49bdcedd0dd301c2983de208"
   claudeCode:
     repository: ghcr.io/matty-v/kyber-claude-code
-    tag: "v2.7.0@sha256:16c90f0a14384e415b5e73ec0ddbff829a6545f574a1edfd932e2bb8803acd6d"
+    tag: "v2.7.1@sha256:023ef5d4c45f8b375829c7355a6a09e38dc41a6e72106d15925d5df59b6ab94d"
   # codex — the second agent runtime (kyber#672). Required here because hk-47 is
   # a Codex agent. The chart treats this tag as OPTIONAL and simply omits
   # KYBER_CODEX_RUNTIME_IMAGE when it is empty
@@ -64,7 +66,7 @@ image:
   # ghcr.io/matty-v/kyber-codex used to be a PRIVATE GHCR package, which with
   # imagePullSecrets: [] would have left hk-47 in ImagePullBackOff. It is public
   # now — re-verified at every bump with an ANONYMOUS ghcr.io token: a manifest
-  # HEAD for v2.7.0 returns 200. Re-check that before moving this pin again; a
+  # HEAD for v2.7.1 returns 200. Re-check that before moving this pin again; a
   # private image here fails at pull time, not at render time.
   #
   # NOTE: the old "kyber-mcp-telegram is still private, 403 as a control" claim
@@ -73,10 +75,10 @@ image:
   # telegramSidecar be pinned below.
   codex:
     repository: ghcr.io/matty-v/kyber-codex
-    tag: "v2.7.0@sha256:4491902f897043d306636a131d09fac2d7a5e91221d1f5dcef99b633128dba74"
+    tag: "v2.7.1@sha256:c28d96424b1c9617c207f92607be239d6e99efc560c756636ad4348165f1a295"
   statusSidecar:
     repository: ghcr.io/matty-v/kyber-status-sidecar
-    tag: "v2.7.0@sha256:39da96ade7cca4688fca39a33177e34dbcf03c70a915d51c456276d7b51c9e7e"
+    tag: "v2.7.1@sha256:c45fd9893280a5cce49f4de00f44c4de7d53b31fb1ad2c2774c1c1eee0e00da7"
   # kyber-mcp-discord sidecar (kyber#646) — injected into barf's pod (channels.discord).
   # Must move in lockstep with controlPlane: mentionOnly (#648) is the control
   # plane rendering DISCORD_MENTION_ONLY and this image honouring it, so it moves
@@ -86,10 +88,11 @@ image:
   # deaf) and a data race on State.Guilds. Barf is the consumer here.
   discordSidecar:
     repository: ghcr.io/matty-v/kyber-mcp-discord
-    tag: "v2.7.0@sha256:c46ecbeb0ef65d7df016489f36ec5e2ecec6e97a92aed215764b7656604c5a5e"
-  # kyber-mcp-telegram sidecar — NEW to this file at v2.7.0, and the gap this
-  # bump closes. kyber#688/#689 converged Telegram onto one MCP sidecar for both
-  # runtimes, and falcon has pinned this image since v2.6.3 — lonestar never did.
+    tag: "v2.7.1@sha256:e34a5752ba1b8a03221cb0c9a2e758fd2c2b0cfa76a6991ec0cd2e9f3a0789b7"
+  # kyber-mcp-telegram sidecar — first pinned here at v2.7.0, which closed a gap
+  # this file had carried for two releases. kyber#688/#689 converged Telegram
+  # onto one MCP sidecar for both runtimes, and falcon had pinned this image
+  # since v2.6.3 while lonestar never did.
   #
   # An empty tag here is NOT a render error, which is exactly why it went
   # unnoticed: chart templates/control-plane/deployment.yaml:174 wraps the env in
@@ -102,7 +105,7 @@ image:
   # pinning it is a no-op until one does — it does not by itself roll anything.
   telegramSidecar:
     repository: ghcr.io/matty-v/kyber-mcp-telegram
-    tag: "v2.7.0@sha256:d444da3b62eaaf1d46fb3a09038a588f2e60bec5c42963c9dcaf64884d365d8c"
+    tag: "v2.7.1@sha256:d711871fd0b97007a6cbb09785b61a9969da793b87deabaa771fbd53ebf0e14f"
 # Public GHCR images — no pull secret required.
 imagePullSecrets: []
 
