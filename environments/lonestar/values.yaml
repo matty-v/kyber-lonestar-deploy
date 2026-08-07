@@ -1,43 +1,56 @@
 # environments/lonestar/values.yaml
 # Kyber on Steve's Proxmox box — cluster kyber-lonestar.
 # Single-node k3s on Ubuntu 24.04, LAN-isolated VM, public via Cloudflare Tunnel.
-# Images pinned to release v2.6.3 (digest-pinned). The cluster tracks the release
+# Images pinned to release v2.7.0 (digest-pinned). The cluster tracks the release
 # line; every pin here is a tagged release build, never a main-commit digest.
 
 image:
-  # All seven images on the v2.6.3 release, digest-pinned. Digests resolved from
-  # GHCR at bump time; controlPlane, nodeAgent and claudeCode cross-checked
-  # against the falcon environment's v2.6.3 pins (kyber-deploy#126) and against
-  # what falcon is actually running — same release, same digests.
+  # All EIGHT images on the v2.7.0 release, digest-pinned. Digests resolved from
+  # GHCR at bump time with an ANONYMOUS pull token — that anonymous 200 is also
+  # the public-pullability proof this cluster needs, because imagePullSecrets is
+  # empty here (a private image fails at pull time, not at render time).
+  # Cross-checked against the falcon environment's v2.7.0 pins — same release,
+  # same digests.
   #
-  # What v2.6.3 carries that v2.6.2 did not:
-  #   - kyber#675 — an Agent on an unconfigured runtime sat with a blank status
-  #     forever. Now a 400 at create time plus a visible RuntimeImageMissing
-  #     condition. This is the bug hk-47 hit on this very cluster (see the codex
-  #     note below); the fix means the next occurrence says so out loud.
-  #     Also fixes Discord late-join deafness and a State.Guilds data race.
-  #   - kyber#677 — Codex agents never cloned their identity repo. hk-47 has been
-  #     living this: /home/kyber/dev did not exist in his pod at all. This bump is
-  #     what finally gives him an identity repo.
-  #   - kyber#679 — the pre-flight model probe leaked a SECOND Telegram poller on
-  #     every pod boot. Two readers on a one-reader token means the loser exits
-  #     permanently and the agent goes silently deaf. Closes kyber#678.
+  # Eight, not seven: telegramSidecar is NEW to this file (see its note below).
+  #
+  # What v2.7.0 carries that v2.6.3 did not:
+  #   - kyber#693 — Telegram sidecar interactions: inbound attachments, edited
+  #     messages, reactions, callbacks and coalesced media albums; inline buttons
+  #     on reply and tri-state keyboard handling on edit_message; outbound files
+  #     via native Telegram photo/video/audio/voice/document/media-group methods;
+  #     typing indicators. Also converges Telegram config across Codex and Claude
+  #     Code agents (allowlist/HMAC/binding migration for existing agents).
+  #   - kyber#695 — the inbound envelope dropped message_id, so `react` and
+  #     `edit_message` could not target a user's message at all. The sidecar was
+  #     always sending it; the binding's JSON-path map just didn't carry it.
+  #     Closes kyber#694.
+  #   - kyber#696 — Codex agents get two auth paths (in-pod `codex login
+  #     --device-auth` for ChatGPT subscriptions, or plain OPENAI_API_KEY) and
+  #     now carry session recall + identity-repo skills across a restart the way
+  #     Claude Code agents already do. hk-47 is the consumer on this cluster:
+  #     v2.6.3 finally gave him an identity repo, this makes him keep it and his
+  #     continuity across a pod roll.
+  #   - kyber#697 — Streamable HTTP Discord MCP: reply, edit, reactions,
+  #     attachment download/upload, long-message splitting, threads, bounded
+  #     recent context, connection diagnostics, idle-gated config convergence.
+  #     Barf is the consumer here.
   #
   # ROLLS AGENT PODS. claude-code, runtime-base and codex all move, so barf,
   # threepio and hk-47 restart and their live sessions end. Identity repos and
   # PVCs are untouched, so they come back with memory and continuity intact.
   controlPlane:
     repository: ghcr.io/matty-v/kyber-control-plane
-    tag: "v2.6.3@sha256:b5fac9602dd14c3bafe0222964178d82eb3df00378128c061716da02ba73c53d"
+    tag: "v2.7.0@sha256:fe0a6d4ac03be60fc5213f4a55fb504269ced8f6c2b2f50bdf5fd356b8c6bb25"
   nodeAgent:
     repository: ghcr.io/matty-v/kyber-node-agent
-    tag: "v2.6.3@sha256:433e8396284bc67a240b1f95282a5f26dea3f6e4bd3ee789da9319400df670e9"
+    tag: "v2.7.0@sha256:0dc95532e9eff0285b05d80ba84f4d155989c6d6ab534c3f635b7e71ff3339db"
   agentBase:
     repository: ghcr.io/matty-v/kyber-runtime-base
-    tag: "v2.6.3@sha256:e47f85522a110a6ec19f637108aa0ff0a4675bfc3ddfe4a7195ea535f57f4ef0"
+    tag: "v2.7.0@sha256:957618b21e1f153f1a26f33390503052dc10ec5a6086bef130f97151b0e14b6a"
   claudeCode:
     repository: ghcr.io/matty-v/kyber-claude-code
-    tag: "v2.6.3@sha256:59d15dcec26645bcb50156d13b8695648429a49c33bf94b1cdc85c957c2b2788"
+    tag: "v2.7.0@sha256:16c90f0a14384e415b5e73ec0ddbff829a6545f574a1edfd932e2bb8803acd6d"
   # codex — the second agent runtime (kyber#672). Required here because hk-47 is
   # a Codex agent. The chart treats this tag as OPTIONAL and simply omits
   # KYBER_CODEX_RUNTIME_IMAGE when it is empty
@@ -50,16 +63,20 @@ image:
   #
   # ghcr.io/matty-v/kyber-codex used to be a PRIVATE GHCR package, which with
   # imagePullSecrets: [] would have left hk-47 in ImagePullBackOff. It is public
-  # now — re-verified at bump time with an ANONYMOUS ghcr.io token: a manifest
-  # HEAD for v2.6.3 returns 200, while kyber-mcp-telegram (still private) returns
-  # 403 as a control. Re-check that before moving this pin again; a private image
-  # here fails at pull time, not at render time.
+  # now — re-verified at every bump with an ANONYMOUS ghcr.io token: a manifest
+  # HEAD for v2.7.0 returns 200. Re-check that before moving this pin again; a
+  # private image here fails at pull time, not at render time.
+  #
+  # NOTE: the old "kyber-mcp-telegram is still private, 403 as a control" claim
+  # that used to live here is STALE — all eight kyber images are public now, and
+  # mcp-telegram was re-verified at 200 anonymously at this bump. It is what let
+  # telegramSidecar be pinned below.
   codex:
     repository: ghcr.io/matty-v/kyber-codex
-    tag: "v2.6.3@sha256:7d5426c132f8267fb1b01da0cf06659e6636aaff42d552fe937ca3b1b02215c2"
+    tag: "v2.7.0@sha256:4491902f897043d306636a131d09fac2d7a5e91221d1f5dcef99b633128dba74"
   statusSidecar:
     repository: ghcr.io/matty-v/kyber-status-sidecar
-    tag: "v2.6.3@sha256:4e397de8a6212b74af0511599a19a03b5cd21e936e2384b3b0c39664848102a8"
+    tag: "v2.7.0@sha256:39da96ade7cca4688fca39a33177e34dbcf03c70a915d51c456276d7b51c9e7e"
   # kyber-mcp-discord sidecar (kyber#646) — injected into barf's pod (channels.discord).
   # Must move in lockstep with controlPlane: mentionOnly (#648) is the control
   # plane rendering DISCORD_MENTION_ONLY and this image honouring it, so it moves
@@ -69,7 +86,23 @@ image:
   # deaf) and a data race on State.Guilds. Barf is the consumer here.
   discordSidecar:
     repository: ghcr.io/matty-v/kyber-mcp-discord
-    tag: "v2.6.3@sha256:0e8261c1a84082721d9ea8990ffba988fae45c59d5b2bf54a06bfe4ca37f9079"
+    tag: "v2.7.0@sha256:c46ecbeb0ef65d7df016489f36ec5e2ecec6e97a92aed215764b7656604c5a5e"
+  # kyber-mcp-telegram sidecar — NEW to this file at v2.7.0, and the gap this
+  # bump closes. kyber#688/#689 converged Telegram onto one MCP sidecar for both
+  # runtimes, and falcon has pinned this image since v2.6.3 — lonestar never did.
+  #
+  # An empty tag here is NOT a render error, which is exactly why it went
+  # unnoticed: chart templates/control-plane/deployment.yaml:174 wraps the env in
+  # `{{- with .Values.image.telegramSidecar }}`, so an empty value simply means
+  # KYBER_TELEGRAM_SIDECAR_IMAGE is never set and Telegram injection is a silent
+  # no-op. Any agent on this cluster enabling channels.telegram would come up
+  # looking healthy and just never receive a message.
+  #
+  # Injected ONLY into pods of agents that enable spec.channels.telegram, so
+  # pinning it is a no-op until one does — it does not by itself roll anything.
+  telegramSidecar:
+    repository: ghcr.io/matty-v/kyber-mcp-telegram
+    tag: "v2.7.0@sha256:d444da3b62eaaf1d46fb3a09038a588f2e60bec5c42963c9dcaf64884d365d8c"
 # Public GHCR images — no pull secret required.
 imagePullSecrets: []
 
